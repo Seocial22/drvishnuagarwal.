@@ -3,12 +3,24 @@ import path from "path";
 import Link from "next/link";
 import Image from "next/image";
 
+const SITE_URL = "https://drvishnuagrawal.in";
+const PUBLISHER_NAME = "Dr. Vishnu Agrawal";
+const PUBLISHER_LOGO = "https://drvishnuagrawal.in/images/logo.png";
+const DEFAULT_IMAGE = "/images/urology-placeholder.jpg";
+
 // Function to read blogs data
 function getBlogs() {
   const filePath = path.join(process.cwd(), "public", "blogs.json");
   const fileData = fs.readFileSync(filePath, "utf-8");
   const blogs = JSON.parse(fileData);
   return blogs;
+}
+
+// Helper: turn a relative or absolute image path into a guaranteed absolute URL
+function toAbsoluteUrl(url) {
+  if (!url) return `${SITE_URL}${DEFAULT_IMAGE}`;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return `${SITE_URL}${url.startsWith("/") ? "" : "/"}${url}`;
 }
 
 // Generate metadata for each blog page
@@ -73,6 +85,46 @@ export async function generateMetadata({ params }) {
       generator: "Next.js",
       "theme-color": "#ffffff",
     },
+  };
+}
+
+// Builds the schema.org Article JSON-LD object for a single blog entry
+function buildBlogJsonLd(blog) {
+  const absoluteImageUrl = toAbsoluteUrl(blog.image);
+  const canonicalUrl = blog.conincalUrl || `${SITE_URL}/blog/${blog.slug}`;
+  const description =
+    blog.metaDescription || blog.excerpt || blog.content.substring(0, 160);
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "@id": `${SITE_URL}/blog/${blog.slug}#article`,
+    headline: blog.title,
+    description,
+    image: [absoluteImageUrl],
+    author: {
+      "@type": "Person",
+      name: PUBLISHER_NAME,
+      url: SITE_URL,
+    },
+    publisher: {
+      "@type": "Organization",
+      name: PUBLISHER_NAME,
+      url: SITE_URL,
+      logo: {
+        "@type": "ImageObject",
+        url: PUBLISHER_LOGO,
+      },
+    },
+    datePublished: blog.date,
+    dateModified: blog.updatedAt || blog.date,
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": canonicalUrl,
+    },
+    keywords: Array.isArray(blog.tags) ? blog.tags.join(", ") : undefined,
+    inLanguage: "en",
+    url: canonicalUrl,
   };
 }
 
@@ -182,8 +234,17 @@ export default async function SingleBlogPage({ params }) {
     day: "numeric",
   });
 
+  // Build the JSON-LD structured data for this blog post
+  const jsonLd = buildBlogJsonLd(blog);
+
   return (
     <article className="min-h-screen bg-gradient-to-b from-blue-50 to-teal-50 py-12">
+      {/* JSON-LD structured data for SEO (Article schema) */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 mb-8">
         <div className=" aspect-[3/1.5] relative w-full rounded-xl overflow-hidden shadow-lg">
           <Image
